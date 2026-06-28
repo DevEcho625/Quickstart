@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.pedroPathing;
 
+import com.pedropathing.control.FilteredPIDFCoefficients;
 import com.pedropathing.control.PIDFCoefficients;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.follower.FollowerConstants;
@@ -16,7 +17,11 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 public class Constants {
     public static FollowerConstants followerConstants = new FollowerConstants()
             .mass(12.25)
-            .headingPIDFCoefficients(new PIDFCoefficients(0.55, 0, 0.01, 0.02))
+            .headingPIDFCoefficients(new PIDFCoefficients(0.57,0, 0.01, 0.03))
+            .translationalPIDFCoefficients(new PIDFCoefficients(0.05, 0, 0.007, 0.02))
+            .drivePIDFCoefficients(new FilteredPIDFCoefficients(0.6,0.0,0.0001,0.6,0.01))
+            .forwardZeroPowerAcceleration(-30.42)
+            .lateralZeroPowerAcceleration(-62.5)
             ; //.mass(mass_in_kgs)
 
     public static PathConstraints pathConstraints = new PathConstraints(0.99, 100, 1, 1);
@@ -32,8 +37,8 @@ public class Constants {
             .leftRearMotorDirection(DcMotorSimple.Direction.REVERSE)
             .rightFrontMotorDirection(DcMotorSimple.Direction.FORWARD)
             .rightRearMotorDirection(DcMotorSimple.Direction.FORWARD)
-            .xVelocity(56.4)
-            .yVelocity(34.351);
+             .xVelocity(60)
+              .yVelocity(43.8);
 
 //
     public static PinpointConstants localizerConstants = new PinpointConstants()
@@ -41,9 +46,10 @@ public class Constants {
             //.forwardPodY(-5.957)
             //.forwardPodY(9.04)
             //.strafePodX(4.5)
-            .strafePodX(7.67)
-            .forwardPodY(3.47)
+            //.strafePodX(7.67)
+            //.forwardPodY(3.47)
 
+            .strafePodX(-7.163) .forwardPodY(-3.1043)
             .distanceUnit(DistanceUnit.INCH)
             .hardwareMapName("pinpoint")
             .encoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD)
