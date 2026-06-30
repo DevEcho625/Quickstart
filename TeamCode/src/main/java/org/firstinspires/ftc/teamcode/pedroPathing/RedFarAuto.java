@@ -15,31 +15,28 @@ import static com.pedropathing.ivy.pedro.PedroCommands.*;
 import static com.pedropathing.ivy.groups.Groups.*;
 import static com.pedropathing.ivy.Scheduler.*;
 
-@Autonomous(name = "Blue Far Auto", group = "Far")
-public class BlueFarAuto extends LinearOpMode {
+@Autonomous(name = "Red Far Auto (Edge Shoot & Park)", group = "Far")
+public class RedFarAuto extends LinearOpMode {
 
     private Follower follower;
     private AutoMechanisms mechanisms;
 
-    // --- FAR SIDE BLUE POSES ---
-    private final Pose startPose = new Pose(56.5, 8.2, 1.57);
+    // --- FAR SIDE RED POSES (144 - Y Mathematically Reflected) ---
+    private final Pose startPose = new Pose(83.5, 8.2, 1.57);
 
-    // ADJUSTED: Brought forward to the absolute legal edge of the far triangle zone
-    private final Pose scorePose = new Pose(56.5, 22.2, -0.65);
+    // ADJUSTED: Re-targeted straight to the lower edge boundary of the triangle
+    private final Pose scorePose = new Pose(83.5, 22.2, 0.65);
 
-    // Parked location shifted smoothly behind the line to clear initial perimeter space
-    private final Pose parkPose  = new Pose(41.25, 22.2, 0.0);
+    private final Pose parkPose  = new Pose(103.25, 22.2, 0.0);
 
     private PathChain scorePreload, parkPath;
 
     public void buildPaths() {
-        // Direct tracking down to the absolute edge point
         scorePreload = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, scorePose))
                 .setLinearHeadingInterpolation(startPose.getHeading(), scorePose.getHeading())
                 .build();
 
-        // Push clean back to vacate the area completely
         parkPath = follower.pathBuilder()
                 .addPath(new BezierLine(scorePose, parkPose))
                 .setLinearHeadingInterpolation(scorePose.getHeading(), parkPose.getHeading())
@@ -59,16 +56,16 @@ public class BlueFarAuto extends LinearOpMode {
         Timer preloadFeedTimer = new Timer();
 
         return sequential(
-                // 1. Spool shooter instantly and trace to the edge line
+                // 1. Warm up shooter and trace to the edge boundary
                 instant(() -> mechanisms.spoolShooter()),
                 follow(follower, scorePreload),
-                waitSeconds(0.25), // Let the chassis settle to maximize trajectory precision
+                waitSeconds(0.25),
 
-                // 2. Closed-loop RPM confirmation lock
+                // 2. RPM velocity verification lock
                 instant(preloadTimeout::resetTimer),
                 waitUntil(() -> mechanisms.shooterReady() || preloadTimeout.getElapsedTimeSeconds() >= 1.5),
 
-                // 3. Smart feader loops out the 3 preloads at matching target velocities
+                // 3. Smart gated feeder loop
                 instant(() -> {
                     mechanisms.deployRamp();
                     preloadFeedTimer.resetTimer();
@@ -88,7 +85,7 @@ public class BlueFarAuto extends LinearOpMode {
                 }),
                 waitSeconds(0.2),
 
-                // 4. Back out to secure parking matrix credit
+                // 4. Vacate tile to clear tracking bounds
                 parallel(
                         follow(follower, parkPath, true),
                         instant(() -> mechanisms.hardStopShooter())

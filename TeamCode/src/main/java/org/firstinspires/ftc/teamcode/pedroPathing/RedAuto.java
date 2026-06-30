@@ -17,14 +17,14 @@ import static com.pedropathing.ivy.groups.Groups.*;
 import static com.pedropathing.ivy.Scheduler.*;
 
 @Autonomous(name = "Red Auto 12-Ball", group = "Main")
-public class RedCloseAuto extends LinearOpMode {
+public class RedAuto extends LinearOpMode {
 
     private Follower follower;
     private AutoMechanisms mechanisms;
 
-    // --- POSES (Perfect 144 - Y Horizontal Mirrors) ---
+    // --- PERFECTLY REFLECTED RED POSES (144 - Y) ---
     private final Pose startPose   = new Pose(21, 20.5, -2.37);
-    private final Pose scorePose   = new Pose(50.66, 55.15, -2.3);
+    private final Pose scorePose   = new Pose(48.66, 53.15, -2.3);
     private final Pose pickup1Pose = new Pose(17, 59, -3.14);
     private final Pose pickup2Pose = new Pose(17.45, 86.612, -3.12);
     private final Pose pickup3Pose = new Pose(14.63, 107.81, -3.12);
@@ -33,20 +33,22 @@ public class RedCloseAuto extends LinearOpMode {
     private PathChain scorePreload, grabPickup1, scorePickup1, grabPickup2, scorePickup2, grabPickup3, scorePickup3, leave;
 
     public void buildPaths() {
+        // Preload Track
         scorePreload = follower.pathBuilder().addPath(new BezierLine(startPose, scorePose)).setLinearHeadingInterpolation(startPose.getHeading(), scorePose.getHeading()).build();
 
-        // Optimized wide Bezier exit vectors to mirror Blue side acceleration curves
-        grabPickup1  = follower.pathBuilder().addPath(new BezierCurve(scorePose, new Pose(45, 49), pickup1Pose)).setLinearHeadingInterpolation(scorePose.getHeading(), pickup1Pose.getHeading()).build();
+        // --- ROW 1 CYCLE ---
+        grabPickup1  = follower.pathBuilder().addPath(new BezierCurve(scorePose, new Pose(50, 76), pickup1Pose)).setLinearHeadingInterpolation(scorePose.getHeading(), pickup1Pose.getHeading()).build();
         scorePickup1 = follower.pathBuilder().addPath(new BezierLine(pickup1Pose, scorePose)).setLinearHeadingInterpolation(pickup1Pose.getHeading(), scorePose.getHeading()).build();
 
-        // Row 2 Control Tangents
-        grabPickup2  = follower.pathBuilder().addPath(new BezierCurve(scorePose, new Pose(55, 79), pickup2Pose)).setLinearHeadingInterpolation(scorePose.getHeading(), pickup2Pose.getHeading()).build();
-        scorePickup2 = follower.pathBuilder().addPath(new BezierCurve(pickup2Pose, new Pose(55, 79), scorePose)).setLinearHeadingInterpolation(pickup2Pose.getHeading(), scorePose.getHeading()).build();
+        // --- ROW 2 CYCLE ---
+        grabPickup2  = follower.pathBuilder().addPath(new BezierCurve(scorePose, new Pose(60, 90), pickup2Pose)).setLinearHeadingInterpolation(scorePose.getHeading(), pickup2Pose.getHeading()).build();
+        scorePickup2 = follower.pathBuilder().addPath(new BezierCurve(pickup2Pose, new Pose(60, 90), scorePose)).setLinearHeadingInterpolation(pickup2Pose.getHeading(), scorePose.getHeading()).build();
 
-        // Row 3 Control Tangents
-        grabPickup3  = follower.pathBuilder().addPath(new BezierCurve(scorePose, new Pose(60, 104), pickup3Pose)).setLinearHeadingInterpolation(scorePose.getHeading(), pickup3Pose.getHeading()).build();
-        scorePickup3 = follower.pathBuilder().addPath(new BezierCurve(pickup3Pose, new Pose(60, 104), scorePose)).setLinearHeadingInterpolation(pickup3Pose.getHeading(), scorePose.getHeading()).build();
+        // --- ROW 3 CYCLE ---
+        grabPickup3  = follower.pathBuilder().addPath(new BezierCurve(scorePose, new Pose(70, 116), pickup3Pose)).setLinearHeadingInterpolation(scorePose.getHeading(), pickup3Pose.getHeading()).build();
+        scorePickup3 = follower.pathBuilder().addPath(new BezierCurve(pickup3Pose, new Pose(70, 116), scorePose)).setLinearHeadingInterpolation(pickup3Pose.getHeading(), scorePose.getHeading()).build();
 
+        // Park Exit
         leave        = follower.pathBuilder().addPath(new BezierLine(scorePose, endPose)).setConstantHeadingInterpolation(scorePose.getHeading()).build();
     }
 
@@ -60,12 +62,10 @@ public class RedCloseAuto extends LinearOpMode {
 
     public Command sampleCycle(PathChain grabPath, PathChain scorePath) {
         Timer safetyTimeout = new Timer();
-        Timer dynamicFeedTimer = new Timer();
 
         return sequential(
-                // Synchronize intake surface velocity with maximum driving traction
                 parallel(
-                        instant(() -> mechanisms.startIntake(1.0)),
+                        instant(() -> mechanisms.startIntake(0.7)),
                         follow(follower, grabPath, true)
                 ),
                 waitSeconds(0.3),
@@ -75,66 +75,31 @@ public class RedCloseAuto extends LinearOpMode {
                         instant(() -> mechanisms.spoolShooter()),
                         follow(follower, scorePath, true)
                 ),
-                waitSeconds(0.2), // Chassis stabilization window
+                waitSeconds(0.15),
 
-                // Verify entry velocity
                 instant(safetyTimeout::resetTimer),
                 waitUntil(() -> mechanisms.shooterReady() || safetyTimeout.getElapsedTimeSeconds() >= 1.2),
 
-                // SMART CYCLE FEEDING: Real-time velocity closed-loop gating
-                instant(() -> {
-                    mechanisms.deployRamp();
-                    dynamicFeedTimer.resetTimer();
-                }),
-                waitUntil(() -> {
-                    if (dynamicFeedTimer.getElapsedTimeSeconds() >= 0.8) {
-                        mechanisms.stopIntake();
-                        mechanisms.retractRamp();
-                        return true;
-                    }
-                    if (mechanisms.shooterReady()) {
-                        mechanisms.startIntake(1.0); // Spooled up -> Feed
-                    } else {
-                        mechanisms.stopIntake();     // Dipped -> Stall feed to recover speed
-                    }
-                    return false;
-                }),
-                waitSeconds(0.2)
+                // Keep 800ms for regular dual-ball collection cycles
+                instant(() -> mechanisms.shoot(800)),
+                waitSeconds(1.0)
         );
     }
 
     public Command autoRoutine() {
         Timer preloadTimeout = new Timer();
-        Timer preloadFeedTimer = new Timer();
-
         return sequential(
                 // --- PRELOAD PHASE ---
                 instant(() -> mechanisms.spoolShooter()),
                 follow(follower, scorePreload),
-                waitSeconds(0.2),
+                waitSeconds(0.15),
 
                 instant(preloadTimeout::resetTimer),
                 waitUntil(() -> mechanisms.shooterReady() || preloadTimeout.getElapsedTimeSeconds() >= 1.5),
 
-                // SMART PRELOAD FEEDING: Mitigates RPM sag across sequential preload shots
-                instant(() -> {
-                    mechanisms.deployRamp();
-                    preloadFeedTimer.resetTimer();
-                }),
-                waitUntil(() -> {
-                    if (preloadFeedTimer.getElapsedTimeSeconds() >= 1.2) {
-                        mechanisms.stopIntake();
-                        mechanisms.retractRamp();
-                        return true;
-                    }
-                    if (mechanisms.shooterReady()) {
-                        mechanisms.startIntake(1.0);
-                    } else {
-                        mechanisms.stopIntake();
-                    }
-                    return false;
-                }),
-                waitSeconds(0.2),
+                // Keep long feed time (1000ms) matching your unjammed firmware configuration
+                instant(() -> mechanisms.shoot(1000)),
+                waitSeconds(1.2),
 
                 // --- CYCLING PHASE ---
                 sampleCycle(grabPickup1, scorePickup1),
